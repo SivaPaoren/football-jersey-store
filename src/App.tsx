@@ -8,6 +8,7 @@ import CheckoutPage from "./pages/CheckoutPage";
 import AboutContactPage from "./pages/AboutContactPage";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import ProductCustomization from "./components/TeamProductForm";
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
             <Route path="/cart" element={<CartPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/about-contact" element={<AboutContactPage />} />
+            <Route path="/admin" element={<ProductCustomization />} />
             {/* Optional: Add a 404 Not Found page */}
             <Route
               path="*"

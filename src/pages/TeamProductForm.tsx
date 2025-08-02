@@ -1,17 +1,24 @@
-// src/components/TeamProductForm.tsx
 import React, { useState } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
-// Import your new CategoryInput component
-import CategoryInput from "./CategoryInput";
+// Initial list of categories. In a real app, this might come from an API.
+const initialCategories = [
+  "Argentina Home",
+  "Club",
+  "National Team",
+  "Retro",
+  "Training",
+];
 
 // 1. Define Zod Schema for validation and type inference
 const teamProductSchema = z.object({
   teamName: z.string().min(1, "Team Name is required"),
   teamDescription: z.string().min(1, "Team Description is required"),
-  price: z.number().positive("Price must be a positive number"),
+  price: z
+    .number({ invalid_type_error: "Price must be a number" })
+    .positive("Price must be a positive number"),
   size: z.enum(["S", "M", "L", "XL", "XXL"], {
     errorMap: () => ({ message: "Please select a size" }),
   }),
@@ -32,46 +39,7 @@ const teamProductSchema = z.object({
   productImage: z
     .instanceof(FileList)
     .refine((fileList) => fileList.length > 0, "Product Image is required"),
-  // Updated category fields for the new "Add New Category" button logic
   category: z.string().min(1, "Category is required"),
-  newCategoryName: z
-    .string()
-    .optional()
-    .refine(
-      (val, ctx) => {
-        // Check if a category is selected AND no standard category matches
-        // This assumes if `newCategoryName` has a value, it's because "Add New" was used.
-        // We make `newCategoryName` required only when it's present in the form and empty.
-        const categoryValue = ctx.parent.category as string; // Access the sibling field
-        const standardCategories = [
-          "Argentina Home",
-          "Club",
-          "National Team",
-          "Retro",
-          "Training",
-        ]; // Must match options in CategoryInput
-
-        // If a new category input is shown (i.e., newCategoryName is being watched/expected)
-        // AND a standard category isn't selected, then newCategoryName must have a value.
-        if (
-          !standardCategories.includes(categoryValue) &&
-          categoryValue &&
-          (!val || val.trim() === "")
-        ) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message:
-              'New Category name is required when "Add New" is used and no standard category is selected.',
-            path: ["newCategoryName"],
-          });
-          return false;
-        }
-        return true;
-      },
-      {
-        message: "New Category name is required",
-      }
-    ),
   gender: z.enum(["Men", "Women", "Kids"], {
     errorMap: () => ({ message: "Please select a gender" }),
   }),
@@ -82,7 +50,6 @@ const teamProductSchema = z.object({
     .or(z.literal("")),
 });
 
-// Infer the form data type from the schema
 type TeamProductFormData = z.infer<typeof teamProductSchema>;
 
 const TeamProductForm: React.FC = () => {
@@ -95,8 +62,7 @@ const TeamProductForm: React.FC = () => {
       size: undefined,
       playerName: "",
       playerNumber: undefined,
-      category: "", // Default for category dropdown
-      newCategoryName: "", // Default for the new category text input
+      category: "",
       gender: undefined,
       additionalNotes: "",
     },
@@ -108,11 +74,28 @@ const TeamProductForm: React.FC = () => {
     formState: { errors, isSubmitting },
     setValue,
     clearErrors,
-  } = methods; // Destructure from methods
+  } = methods;
 
+  // State to manage the image preview
   const productImageWatch = watch("productImage");
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
+  // State to manage categories and the "add new" pop-up
+  const [categories, setCategories] = useState(initialCategories);
+  const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+
+  // Handle adding a new category
+  const handleAddNewCategory = () => {
+    if (newCategoryName.trim()) {
+      setCategories([...categories, newCategoryName]); // Add the new category
+      setValue("category", newCategoryName); // Set it as the selected value in the form state
+      setNewCategoryName(""); // Clear input
+      setIsNewCategoryModalOpen(false); // Close the modal
+    }
+  };
+
+  // Effect to handle image preview
   React.useEffect(() => {
     if (productImageWatch && productImageWatch.length > 0) {
       const file = productImageWatch[0];
@@ -131,19 +114,9 @@ const TeamProductForm: React.FC = () => {
   }, [productImageWatch]);
 
   const onSubmit = (data: TeamProductFormData) => {
-    // Determine the final category value
-    // If newCategoryName has a value and category is not selected OR if 'Add New' was explicitly used
-    // you might refine this logic based on how you want to handle the dropdown value after "Add New" is clicked.
-    // For now, if newCategoryName has a value, we prioritize it.
-    const finalCategory =
-      data.newCategoryName && data.newCategoryName.trim() !== ""
-        ? data.newCategoryName
-        : data.category;
-
+    // This will only log if validation passes.
     console.log("Form Data Submitted:", {
       ...data,
-      category: finalCategory, // Use the final determined category
-      newCategoryName: undefined, // Explicitly remove newCategoryName from the submitted data
       productImage: data.productImage[0]?.name,
     });
     alert("Form submitted successfully! Check console for data.");
@@ -158,6 +131,16 @@ const TeamProductForm: React.FC = () => {
 
         <FormProvider {...methods}>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            {/* --- DEBUGGING: Uncomment the lines below to see form state and errors in the console --- */}
+            {/*
+            <pre className="text-xs text-gray-600 bg-gray-100 p-2 rounded-md overflow-auto">
+              Form Values: {JSON.stringify(watch(), null, 2)}
+            </pre>
+            <pre className="text-xs text-red-600 bg-red-100 p-2 rounded-md overflow-auto">
+              Errors: {JSON.stringify(errors, null, 2)}
+            </pre>
+            */}
+
             {/* Team Name */}
             <div>
               <label
@@ -337,13 +320,47 @@ const TeamProductForm: React.FC = () => {
               )}
               {errors.productImage && (
                 <p className="mt-1 text-sm text-red-600">
-                  {errors.productImage.message}
+                  {errors.productImage.message?.toString()}
                 </p>
               )}
             </div>
 
-            {/* Render the CategoryInput component here */}
-            <CategoryInput />
+            {/* Category Dropdown & Add New Button */}
+            <div>
+              <label
+                htmlFor="category"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Category <span className="text-red-500">*</span>
+              </label>
+              <div className="flex items-center space-x-2">
+                <select
+                  id="category"
+                  {...methods.register("category")}
+                  className={`block w-full pl-3 pr-10 py-2 text-base border rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm
+                    ${errors.category ? "border-red-500" : "border-gray-300"}`}
+                >
+                  <option value="">Select a category</option>
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setIsNewCategoryModalOpen(true)}
+                  className="whitespace-nowrap px-4 py-2 bg-indigo-50 border border-indigo-300 rounded-md text-sm font-medium text-indigo-700 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+                >
+                  Add New
+                </button>
+              </div>
+              {errors.category && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.category.message?.toString()}
+                </p>
+              )}
+            </div>
 
             {/* Gender Radio Buttons */}
             <div>
@@ -413,6 +430,42 @@ const TeamProductForm: React.FC = () => {
             </button>
           </form>
         </FormProvider>
+
+        {/* Add New Category Modal */}
+        {isNewCategoryModalOpen && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+            <div className="relative p-6 sm:p-8 bg-white w-full max-w-md rounded-lg shadow-xl animate-fade-in-up">
+              <h3 className="text-lg font-bold mb-4">Add New Category</h3>
+              <input
+                type="text"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Enter new category name"
+                className="w-full px-4 py-2 border rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              />
+              <div className="mt-4 flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNewCategoryModalOpen(false);
+                    setNewCategoryName(""); // Clear input on cancel
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddNewCategory}
+                  disabled={!newCategoryName.trim()}
+                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-indigo-400 transition-colors"
+                >
+                  Add Category
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

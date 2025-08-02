@@ -1,10 +1,9 @@
 // src/components/CategoryInput.tsx
 import React, { useState } from "react";
-import { useFormContext } from "react-hook-form"; // For accessing form context
-import { z } from "zod"; // For type inference
+import { useFormContext } from "react-hook-form";
 
-// Define the available standard categories
-const standardCategories = [
+// Initial list of categories. This could come from an API in a real app.
+const initialCategories = [
   "Argentina Home",
   "Club",
   "National Team",
@@ -16,7 +15,7 @@ const standardCategories = [
 // You'll need to ensure your main form's schema includes 'category' and 'newCategoryName'
 interface CategoryInputFormFields {
   category: string;
-  newCategoryName?: string; // Optional because it's only set when "Add New" is used
+  newCategoryName?: string; // This field is no longer part of the main form's state with this approach
 }
 
 const CategoryInput: React.FC = () => {
@@ -25,37 +24,31 @@ const CategoryInput: React.FC = () => {
     watch,
     setValue,
     formState: { errors },
-    clearErrors, // To clear errors on newCategoryName when toggling
   } = useFormContext<CategoryInputFormFields>();
 
-  // State to control visibility of the "New Category Name" input
-  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+  // State to manage the list of available categories
+  const [categories, setCategories] = useState(initialCategories);
+  // State to control the visibility of the "Add New" modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  // State to hold the value of the new category input
+  const [newCategoryName, setNewCategoryName] = useState("");
 
-  const selectedCategoryValue = watch("category"); // Watch the selected category
-
-  // Effect to manage the state of the "New Category Name" input
-  React.useEffect(() => {
-    // If a standard category is selected OR the input is hidden, clear newCategoryName value and errors
-    if (selectedCategoryValue !== "New Category" && !showNewCategoryInput) {
-      setValue("newCategoryName", "");
-      clearErrors("newCategoryName");
+  // Handler to add the new category to the list
+  const handleAddNewCategory = () => {
+    if (newCategoryName.trim()) {
+      // Add the new category to our list of categories
+      setCategories([...categories, newCategoryName]);
+      // Set the newly added category as the selected value in the form
+      setValue("category", newCategoryName);
+      // Clear the input field and close the modal
+      setNewCategoryName("");
+      setIsModalOpen(false);
     }
-  }, [selectedCategoryValue, showNewCategoryInput, setValue, clearErrors]);
-
-  const handleAddNewCategoryClick = () => {
-    setShowNewCategoryInput(true);
-    // Optionally pre-select the "New Category" value in the dropdown
-    // if you want to visually tie the two together, but it's not strictly necessary.
-    // setValue('category', 'New Category');
   };
 
-  const handleCancelNewCategory = () => {
-    setShowNewCategoryInput(false);
-    setValue("newCategoryName", ""); // Clear the input
-    clearErrors("newCategoryName"); // Clear any errors for this field
-    // If you want to revert dropdown to default or previously selected, do it here
-    // setValue('category', ''); // Or based on some previous state
-  };
+  // The modal is triggered by a button click, so we don't need a useEffect
+  // to manage its visibility based on the selected value. The dropdown
+  // and the new category input are now separate UI flows.
 
   return (
     <div>
@@ -75,21 +68,20 @@ const CategoryInput: React.FC = () => {
               ${errors.category ? "border-red-500" : "border-gray-300"}`}
           >
             <option value="">Select a category</option>
-            {standardCategories.map((cat) => (
+            {/* Dynamically render options from our state */}
+            {categories.map((cat) => (
               <option key={cat} value={cat}>
                 {cat}
               </option>
             ))}
           </select>
-          {!showNewCategoryInput && (
-            <button
-              type="button"
-              onClick={handleAddNewCategoryClick}
-              className="whitespace-nowrap px-4 py-2 bg-indigo-50 border border-indigo-300 rounded-md text-sm font-medium text-indigo-700 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
-            >
-              Add New
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="whitespace-nowrap px-4 py-2 bg-indigo-50 border border-indigo-300 rounded-md text-sm font-medium text-indigo-700 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+          >
+            Add New
+          </button>
         </div>
         {errors.category && (
           <p className="mt-1 text-sm text-red-600">
@@ -98,36 +90,38 @@ const CategoryInput: React.FC = () => {
         )}
       </div>
 
-      {/* New Category Name Input (conditionally rendered) */}
-      {showNewCategoryInput && (
-        <div className="mt-4 p-4 border border-gray-200 rounded-md bg-gray-50">
-          <label
-            htmlFor="newCategoryName"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            New Category Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            id="newCategoryName"
-            {...register("newCategoryName")}
-            className={`block w-full px-4 py-2 border rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm
-              ${errors.newCategoryName ? "border-red-500" : "border-gray-300"}`}
-            placeholder="e.g., European Leagues"
-          />
-          {errors.newCategoryName && (
-            <p className="mt-1 text-sm text-red-600">
-              {errors.newCategoryName.message?.toString()}
-            </p>
-          )}
-          <div className="mt-3 flex justify-end">
-            <button
-              type="button"
-              onClick={handleCancelNewCategory}
-              className="px-3 py-1 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
-            >
-              Cancel
-            </button>
+      {/* Add New Category Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+          <div className="relative p-6 sm:p-8 bg-white w-full max-w-md rounded-lg shadow-xl animate-fade-in-up">
+            <h3 className="text-lg font-bold mb-4">Add New Category</h3>
+            <input
+              type="text"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="Enter new category name"
+              className="w-full px-4 py-2 border rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            />
+            <div className="mt-4 flex justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setNewCategoryName(""); // Clear input on cancel
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAddNewCategory}
+                disabled={!newCategoryName.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-indigo-400 transition-colors"
+              >
+                Add Category
+              </button>
+            </div>
           </div>
         </div>
       )}

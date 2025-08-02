@@ -8,7 +8,7 @@ import CheckoutPage from "./pages/CheckoutPage";
 import AboutContactPage from "./pages/AboutContactPage";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-import ProductCustomization from "./components/TeamProductForm";
+import ProductCustomization from "./pages/TeamProductForm";
 
 function App() {
   return (

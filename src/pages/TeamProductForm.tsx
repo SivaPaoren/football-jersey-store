@@ -3,6 +3,9 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
+// --- NEW: Import your API service function ---
+import { createProduct } from "../services/productService";
+
 // Initial list of categories. In a real app, this might come from an API.
 const initialCategories = [
   "Argentina Home",
@@ -14,14 +17,19 @@ const initialCategories = [
 
 // 1. Define Zod Schema for validation and type inference
 const teamProductSchema = z.object({
+  productName: z.string().min(1, "Product Name is required"),
   teamName: z.string().min(1, "Team Name is required"),
   teamDescription: z.string().min(1, "Team Description is required"),
   price: z
     .number({ invalid_type_error: "Price must be a number" })
     .positive("Price must be a positive number"),
-  size: z.enum(["S", "M", "L", "XL", "XXL"], {
-    errorMap: () => ({ message: "Please select a size" }),
-  }),
+  size: z
+    .array(
+      z.enum(["S", "M", "L", "XL", "XXL"], {
+        errorMap: () => ({ message: "Invalid size selected" }),
+      })
+    )
+    .min(1, "At least one size is required"),
   playerName: z
     .string()
     .max(50, "Player Name cannot exceed 50 characters")
@@ -38,11 +46,12 @@ const teamProductSchema = z.object({
   ),
   productImage: z
     .instanceof(FileList)
-    .refine((fileList) => fileList.length > 0, "Product Image is required"),
+    .refine(
+      (fileList) => fileList.length > 0,
+      "At least one image is required"
+    ),
   category: z.string().min(1, "Category is required"),
-  gender: z.enum(["Men", "Women", "Kids"], {
-    errorMap: () => ({ message: "Please select a gender" }),
-  }),
+  tag: z.string().min(1, "Tag is required"),
   additionalNotes: z
     .string()
     .max(200, "Additional Notes cannot exceed 200 characters")
@@ -56,14 +65,15 @@ const TeamProductForm: React.FC = () => {
   const methods = useForm<TeamProductFormData>({
     resolver: zodResolver(teamProductSchema),
     defaultValues: {
+      productName: "",
       teamName: "",
       teamDescription: "",
       price: undefined,
-      size: undefined,
+      size: [],
       playerName: "",
       playerNumber: undefined,
       category: "",
-      gender: undefined,
+      tag: "",
       additionalNotes: "",
     },
   });
@@ -74,11 +84,12 @@ const TeamProductForm: React.FC = () => {
     formState: { errors, isSubmitting },
     setValue,
     clearErrors,
+    reset, // Added reset to clear form after successful submission
   } = methods;
 
-  // State to manage the image preview
+  // State to manage the image previews
   const productImageWatch = watch("productImage");
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
 
   // State to manage categories and the "add new" pop-up
   const [categories, setCategories] = useState(initialCategories);
@@ -88,38 +99,54 @@ const TeamProductForm: React.FC = () => {
   // Handle adding a new category
   const handleAddNewCategory = () => {
     if (newCategoryName.trim()) {
-      setCategories([...categories, newCategoryName]); // Add the new category
-      setValue("category", newCategoryName); // Set it as the selected value in the form state
-      setNewCategoryName(""); // Clear input
-      setIsNewCategoryModalOpen(false); // Close the modal
+      setCategories([...categories, newCategoryName]);
+      setValue("category", newCategoryName);
+      setNewCategoryName("");
+      setIsNewCategoryModalOpen(false);
     }
   };
 
-  // Effect to handle image preview
+  // Effect to handle image preview URLs and clean up
   React.useEffect(() => {
+    const newUrls: string[] = [];
     if (productImageWatch && productImageWatch.length > 0) {
-      const file = productImageWatch[0];
-      if (file && file.type.startsWith("image/")) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setImagePreviewUrl(reader.result as string);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        setImagePreviewUrl(null);
-      }
-    } else {
-      setImagePreviewUrl(null);
+      Array.from(productImageWatch).forEach((file) => {
+        if (file && file.type.startsWith("image/")) {
+          newUrls.push(URL.createObjectURL(file));
+        }
+      });
     }
+    setImagePreviewUrls(newUrls);
+
+    // Clean up old object URLs when component unmounts or imageWatch changes
+    return () => {
+      newUrls.forEach(URL.revokeObjectURL);
+    };
   }, [productImageWatch]);
 
-  const onSubmit = (data: TeamProductFormData) => {
-    // This will only log if validation passes.
-    console.log("Form Data Submitted:", {
-      ...data,
-      productImage: data.productImage[0]?.name,
-    });
-    alert("Form submitted successfully! Check console for data.");
+  // --- UPDATED: API Submission Function to use the service file ---
+  const onSubmit = async (data: TeamProductFormData) => {
+    console.log("Form Data to be Submitted:", data); // Log the raw data
+
+    try {
+      // Destructure image files separately as they are not part of ProductApiData
+      const { productImage, ...apiData } = data;
+
+      // Call the API function from your service file
+      const result = await createProduct(apiData, productImage);
+
+      console.log("API Response:", result);
+      alert("Product created successfully!");
+      reset(); // Reset form fields after successful submission
+      setImagePreviewUrls([]); // Clear image previews
+      // Optionally reset categories if you fetch them dynamically
+      // setCategories(initialCategories);
+    } catch (error: any) {
+      console.error("Submission Error:", error);
+      alert(
+        `${error.message || "An unexpected error occurred. Please try again."}`
+      );
+    }
   };
 
   return (
@@ -140,6 +167,29 @@ const TeamProductForm: React.FC = () => {
               Errors: {JSON.stringify(errors, null, 2)}
             </pre>
             */}
+
+            {/* Product Name */}
+            <div>
+              <label
+                htmlFor="productName"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Product Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="productName"
+                {...methods.register("productName")}
+                className={`block w-full px-4 py-2 border rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm
+                  ${errors.productName ? "border-red-500" : "border-gray-300"}`}
+                placeholder="e.g., Messi Argentina Jersey"
+              />
+              {errors.productName && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.productName.message}
+                </p>
+              )}
+            </div>
 
             {/* Team Name */}
             <div>
@@ -215,30 +265,33 @@ const TeamProductForm: React.FC = () => {
               )}
             </div>
 
-            {/* Size Dropdown */}
+            {/* Size Checkboxes */}
             <div>
-              <label
-                htmlFor="size"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Size <span className="text-red-500">*</span>
               </label>
-              <select
-                id="size"
-                {...methods.register("size")}
-                className={`block w-full pl-3 pr-10 py-2 text-base border rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm
-                  ${errors.size ? "border-red-500" : "border-gray-300"}`}
-              >
-                <option value="">Select a size</option>
+              <div className="mt-2 space-x-4 flex">
                 {["S", "M", "L", "XL", "XXL"].map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
+                  <div key={s} className="flex items-center">
+                    <input
+                      id={`size-${s}`}
+                      type="checkbox"
+                      value={s}
+                      {...methods.register("size")}
+                      className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                    />
+                    <label
+                      htmlFor={`size-${s}`}
+                      className="ml-2 block text-sm text-gray-900 cursor-pointer"
+                    >
+                      {s}
+                    </label>
+                  </div>
                 ))}
-              </select>
+              </div>
               {errors.size && (
                 <p className="mt-1 text-sm text-red-600">
-                  {errors.size.message}
+                  {errors.size.message?.toString()}
                 </p>
               )}
             </div>
@@ -291,31 +344,35 @@ const TeamProductForm: React.FC = () => {
               )}
             </div>
 
-            {/* Product Image Upload */}
+            {/* Product Image Upload (Multiple) */}
             <div>
               <label
                 htmlFor="productImage"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Product Image <span className="text-red-500">*</span>
+                Product Images <span className="text-red-500">*</span>
               </label>
               <input
                 type="file"
                 id="productImage"
                 accept="image/*"
+                multiple // Allows multiple file selection
                 onChange={(e) => {
                   methods.setValue("productImage", e.target.files as FileList);
                   methods.clearErrors("productImage");
                 }}
                 className="block w-full text-sm text-gray-900 border border-gray-300 rounded-md cursor-pointer bg-gray-50 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
               />
-              {imagePreviewUrl && (
-                <div className="mt-4 flex justify-center">
-                  <img
-                    src={imagePreviewUrl}
-                    alt="Product Preview"
-                    className="max-h-48 rounded-md shadow-md object-contain"
-                  />
+              {imagePreviewUrls.length > 0 && (
+                <div className="mt-4 flex flex-wrap justify-center gap-4">
+                  {imagePreviewUrls.map((url, index) => (
+                    <img
+                      key={index}
+                      src={url}
+                      alt={`Product Preview ${index + 1}`}
+                      className="h-32 w-32 object-contain rounded-md shadow-md"
+                    />
+                  ))}
                 </div>
               )}
               {errors.productImage && (
@@ -362,33 +419,25 @@ const TeamProductForm: React.FC = () => {
               )}
             </div>
 
-            {/* Gender Radio Buttons */}
+            {/* Tag Input */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Gender <span className="text-red-500">*</span>
+              <label
+                htmlFor="tag"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Tag <span className="text-red-500">*</span>
               </label>
-              <div className="mt-2 space-y-2 sm:flex sm:space-y-0 sm:space-x-4">
-                {["Men", "Women", "Kids"].map((genderOption) => (
-                  <div key={genderOption} className="flex items-center">
-                    <input
-                      id={`gender-${genderOption}`}
-                      type="radio"
-                      value={genderOption}
-                      {...methods.register("gender")}
-                      className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"
-                    />
-                    <label
-                      htmlFor={`gender-${genderOption}`}
-                      className="ml-2 block text-sm text-gray-900 cursor-pointer"
-                    >
-                      {genderOption}
-                    </label>
-                  </div>
-                ))}
-              </div>
-              {errors.gender && (
+              <input
+                type="text"
+                id="tag"
+                {...methods.register("tag")}
+                className={`block w-full px-4 py-2 border rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm
+                  ${errors.tag ? "border-red-500" : "border-gray-300"}`}
+                placeholder="e.g., #2010worldcup #homekit"
+              />
+              {errors.tag && (
                 <p className="mt-1 text-sm text-red-600">
-                  {errors.gender.message}
+                  {errors.tag.message}
                 </p>
               )}
             </div>

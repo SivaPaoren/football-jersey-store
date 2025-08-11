@@ -67,3 +67,4 @@ export default tseslint.config([
   },
 ])
 ```
+# football-jersey-store

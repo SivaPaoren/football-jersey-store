@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { products } from "../data/products";
+import { products } from "../data/products"; // Ensure this imports from your updated products.ts
 import { useCart } from "../context/CartContext";
 import { motion } from "framer-motion";
 
 const ProductDetailPage = () => {
   const { id } = useParams<{ id: string }>();
+  // Ensure 'product' is typed as 'Product' for better type inference if using TypeScript
   const product = products.find((p) => p.id === id);
   const { addToCart } = useCart();
 
@@ -13,13 +14,24 @@ const ProductDetailPage = () => {
     undefined
   );
   const [selectedPlayer, setSelectedPlayer] = useState<string>("");
+  // New state for the currently displayed large image
+  const [currentDisplayedImage, setCurrentDisplayedImage] =
+    useState<string>("");
 
   useEffect(() => {
     // Set initial selected size to the first available size if product exists
     if (product && product.sizes.length > 0) {
       setSelectedSize(product.sizes[0]);
     }
-  }, [product]);
+    // Set initial displayed image to the first gallery image or the default image
+    if (product) {
+      setCurrentDisplayedImage(
+        product.galleryImages && product.galleryImages.length > 0
+          ? product.galleryImages[0]
+          : product.image
+      );
+    }
+  }, [product]); // Dependency array includes product to re-run if product changes (e.g., if ID changes dynamically)
 
   if (!product) {
     return (
@@ -39,7 +51,7 @@ const ProductDetailPage = () => {
       id: product.id,
       name: product.name,
       price: product.price,
-      image: product.image,
+      image: product.image, // Use the default product image for the cart item thumbnail
       selectedSize: selectedSize,
       selectedPlayer:
         selectedPlayer.trim() !== "" ? selectedPlayer.trim() : undefined,
@@ -52,6 +64,12 @@ const ProductDetailPage = () => {
     );
   };
 
+  // Determine which images to show in the gallery
+  const imagesToDisplay =
+    product.galleryImages && product.galleryImages.length > 0
+      ? product.galleryImages
+      : [product.image]; // Fallback to just the main image if no gallery
+
   return (
     <div className="container mx-auto my-12 px-4">
       <motion.div
@@ -60,16 +78,42 @@ const ProductDetailPage = () => {
         transition={{ duration: 0.5 }}
         className="flex flex-col md:flex-row gap-8 bg-white p-6 rounded-lg shadow-lg"
       >
-        <div className="md:w-1/2 flex justify-center items-center">
+        {/* Product Image Gallery */}
+        <div className="md:w-1/2 flex flex-col items-center">
+          {/* Main Display Image */}
           <motion.img
-            src={product.image}
+            key={currentDisplayedImage} // Key helps Framer Motion re-animate on image change
+            src={currentDisplayedImage}
             alt={product.name}
-            className="w-full max-w-md h-auto object-contain rounded-md shadow-md"
-            initial={{ scale: 0.9 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
+            className="w-full max-w-md h-auto object-contain rounded-md shadow-md mb-4"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3 }}
           />
+
+          {/* Thumbnail Gallery */}
+          {imagesToDisplay.length > 1 && ( // Only show thumbnails if more than one image
+            <div className="flex flex-wrap justify-center gap-3 mt-4">
+              {imagesToDisplay.map((imgUrl, index) => (
+                <motion.img
+                  key={index}
+                  src={imgUrl}
+                  alt={`${product.name} - View ${index + 1}`}
+                  className={`w-20 h-20 object-cover rounded-md cursor-pointer border-2 transition-all duration-200 ${
+                    currentDisplayedImage === imgUrl
+                      ? "border-blue-600 shadow-md"
+                      : "border-transparent hover:border-gray-300"
+                  }`}
+                  onClick={() => setCurrentDisplayedImage(imgUrl)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                />
+              ))}
+            </div>
+          )}
         </div>
+
+        {/* Product Details and Form */}
         <div className="md:w-1/2 flex flex-col justify-between">
           <div>
             <h1 className="text-4xl font-bold text-gray-900 mb-2">

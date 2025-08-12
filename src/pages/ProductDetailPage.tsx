@@ -1,30 +1,37 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { products } from "../data/products"; // Ensure this imports from your updated products.ts
+// Ensure Product type is imported from your types file, or from products.ts if defined there
+import { products } from "../data/products";
+import type { Product } from "../types/product";
 import { useCart } from "../context/CartContext";
 import { motion } from "framer-motion";
 
-const ProductDetailPage = () => {
+const ProductDetailPage: React.FC = () => {
+  // useParams can return { id?: string }, so we cast it for type safety
   const { id } = useParams<{ id: string }>();
-  // Ensure 'product' is typed as 'Product' for better type inference if using TypeScript
-  const product = products.find((p) => p.id === id);
+  // Ensure product is explicitly typed as Product or undefined
+  const product: Product | undefined = products.find((p) => p.id === id);
+  // useCart context type is assumed to be handled within its own file
   const { addToCart } = useCart();
 
+  // State for selected size, initialized as undefined to allow for validation check
   const [selectedSize, setSelectedSize] = useState<string | undefined>(
     undefined
   );
+  // State for player name input
   const [selectedPlayer, setSelectedPlayer] = useState<string>("");
-  // New state for the currently displayed large image
+  // State for the currently displayed large image in the gallery
   const [currentDisplayedImage, setCurrentDisplayedImage] =
     useState<string>("");
 
+  // Effect to initialize selected size and current displayed image when product data loads
   useEffect(() => {
-    // Set initial selected size to the first available size if product exists
-    if (product && product.sizes.length > 0) {
-      setSelectedSize(product.sizes[0]);
-    }
-    // Set initial displayed image to the first gallery image or the default image
     if (product) {
+      // Set initial selected size to the first available size if product exists
+      if (product.sizes.length > 0) {
+        setSelectedSize(product.sizes[0]);
+      }
+      // Set initial displayed image to the first gallery image or the default image
       setCurrentDisplayedImage(
         product.galleryImages && product.galleryImages.length > 0
           ? product.galleryImages[0]
@@ -33,6 +40,7 @@ const ProductDetailPage = () => {
     }
   }, [product]); // Dependency array includes product to re-run if product changes (e.g., if ID changes dynamically)
 
+  // Handle case where product is not found
   if (!product) {
     return (
       <div className="text-center my-10 text-xl text-gray-700">
@@ -41,6 +49,7 @@ const ProductDetailPage = () => {
     );
   }
 
+  // Handle Add to Cart button click
   const handleAddToCart = () => {
     if (!selectedSize) {
       alert("Please select a size before adding to cart.");
@@ -64,8 +73,8 @@ const ProductDetailPage = () => {
     );
   };
 
-  // Determine which images to show in the gallery
-  const imagesToDisplay =
+  // Determine which images to show in the gallery thumbnails
+  const imagesToDisplay: string[] =
     product.galleryImages && product.galleryImages.length > 0
       ? product.galleryImages
       : [product.image]; // Fallback to just the main image if no gallery
@@ -78,7 +87,7 @@ const ProductDetailPage = () => {
         transition={{ duration: 0.5 }}
         className="flex flex-col md:flex-row gap-8 bg-white p-6 rounded-lg shadow-lg"
       >
-        {/* Product Image Gallery */}
+        {/* Product Image Gallery Section */}
         <div className="md:w-1/2 flex flex-col items-center">
           {/* Main Display Image */}
           <motion.img
@@ -91,8 +100,8 @@ const ProductDetailPage = () => {
             transition={{ duration: 0.3 }}
           />
 
-          {/* Thumbnail Gallery */}
-          {imagesToDisplay.length > 1 && ( // Only show thumbnails if more than one image
+          {/* Thumbnail Gallery (only shown if there's more than one image) */}
+          {imagesToDisplay.length > 1 && (
             <div className="flex flex-wrap justify-center gap-3 mt-4">
               {imagesToDisplay.map((imgUrl, index) => (
                 <motion.img
@@ -101,10 +110,10 @@ const ProductDetailPage = () => {
                   alt={`${product.name} - View ${index + 1}`}
                   className={`w-20 h-20 object-cover rounded-md cursor-pointer border-2 transition-all duration-200 ${
                     currentDisplayedImage === imgUrl
-                      ? "border-blue-600 shadow-md"
-                      : "border-transparent hover:border-gray-300"
+                      ? "border-blue-600 shadow-md" // Highlight active thumbnail
+                      : "border-transparent hover:border-gray-300" // Subtle hover for others
                   }`}
-                  onClick={() => setCurrentDisplayedImage(imgUrl)}
+                  onClick={() => setCurrentDisplayedImage(imgUrl)} // Set main image on click
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 />
@@ -113,7 +122,7 @@ const ProductDetailPage = () => {
           )}
         </div>
 
-        {/* Product Details and Form */}
+        {/* Product Details and Form Section */}
         <div className="md:w-1/2 flex flex-col justify-between">
           <div>
             <h1 className="text-4xl font-bold text-gray-900 mb-2">

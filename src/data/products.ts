@@ -1,5 +1,5 @@
 // src/data/products.ts
-import type { Product } from './product';
+import type { Product } from '../types/product';
 
 export const products: Product[] = [
   {
@@ -54,7 +54,7 @@ export const products: Product[] = [
     team: 'Liverpool FC',
     price: 88.00,
     image: '/images/liverpool_third.jpg',
-    galleryImages: ['/images/liverpool_third.jpg'],
+    galleryImages: ['/images/realmadrid1.jpg','/images/realmadrid2.jpg','/images/realmadrid3.jpg'],
     description: 'Liverpool FC\'s striking third kit for the upcoming season. Unique design with advanced moisture-wicking fabric.',
     sizes: ['S', 'M', 'L', 'XL', 'XXL'],
     isFeatured: true,

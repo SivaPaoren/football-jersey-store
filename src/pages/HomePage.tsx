@@ -1,12 +1,25 @@
-// src/pages/HomePage.jsx
+// src/pages/HomePage.tsx
 import React from "react";
-import { products } from "../data/products"; // Ensure this import points to your modified products.ts
-import ProductCard from "../components/ProductCard"; // Assuming you have a ProductCard component
+// Ensure this import points to your modified products.ts (which should also be TypeScript)
+import { products } from "../data/products";
+import type { Product } from "../types/product";
+import ProductCard from "../components/ProductCard"; // Assuming ProductCard.tsx
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom"; // Assuming you are using React Router for navigation
 
+// Define prop types for ProductSection
+interface ProductSectionProps {
+  title: string;
+  products: Product[]; // Use the Product interface from your types file
+  categoryType: string; // The string used for the URL query parameter
+}
+
 // Helper component to render a section of products
-const ProductSection = ({ title, products }) => (
+const ProductSection: React.FC<ProductSectionProps> = ({
+  title,
+  products,
+  categoryType,
+}) => (
   <section className="container mx-auto my-16 px-4">
     <h2 className="text-3xl md:text-4xl font-bold text-center mb-10 text-gray-800">
       {title}
@@ -34,7 +47,8 @@ const ProductSection = ({ title, products }) => (
     )}
     <div className="text-center mt-12">
       <Link
-        to="/shop" // You might want to link to /shop?category=XYZ for specific category pages
+        // Pass categoryType as a query parameter to filter on the /shop page
+        to={`/shop?type=${encodeURIComponent(categoryType || "")}`}
         className="text-blue-600 text-lg font-semibold hover:underline"
       >
         View All {title.replace(" Jerseys", "")} &rarr;
@@ -43,18 +57,21 @@ const ProductSection = ({ title, products }) => (
   </section>
 );
 
-const HomePage = () => {
+const HomePage: React.FC = () => {
+  // Explicitly define HomePage as a React Functional Component
   // Filter products for the Featured Section
-  const featuredProducts = products.filter((p) => p.isFeatured).slice(0, 6); // Display up to 6 featured
+  const featuredProducts: Product[] = products
+    .filter((p) => p.isFeatured)
+    .slice(0, 6);
 
   // Filter products for new categories based on the 'type' property
-  const countryBasedProducts = products
+  const countryBasedProducts: Product[] = products
     .filter((p) => p.type === "country")
     .slice(0, 6);
-  const playerBasedProducts = products
+  const playerBasedProducts: Product[] = products
     .filter((p) => p.type === "player")
     .slice(0, 6);
-  const retroBasedProducts = products
+  const retroBasedProducts: Product[] = products
     .filter((p) => p.type === "retro")
     .slice(0, 6);
 
@@ -92,7 +109,11 @@ const HomePage = () => {
       </motion.section>
 
       {/* Featured Section */}
-      <ProductSection title="Featured Jerseys" products={featuredProducts} />
+      <ProductSection
+        title="Featured Jerseys"
+        products={featuredProducts}
+        categoryType="featured"
+      />
 
       <hr className="my-10 border-gray-200" />
 
@@ -101,6 +122,7 @@ const HomePage = () => {
         <ProductSection
           title="National Team Jerseys"
           products={countryBasedProducts}
+          categoryType="country"
         />
       )}
 
@@ -111,6 +133,7 @@ const HomePage = () => {
         <ProductSection
           title="Player Edition Jerseys"
           products={playerBasedProducts}
+          categoryType="player"
         />
       )}
 
@@ -121,6 +144,7 @@ const HomePage = () => {
         <ProductSection
           title="Retro Collection"
           products={retroBasedProducts}
+          categoryType="retro"
         />
       )}
     </div>
